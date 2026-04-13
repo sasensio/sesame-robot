@@ -37,12 +37,16 @@ This document provides technical information on the firmware architecture, contr
    - Go to **Tools → Board → Boards Manager**
    - Search for "ESP32" and install "ESP32 by Espressif Systems" (v2.0.0 or higher)
 3. **Required Libraries** (install via Library Manager):
-  - `ESP32Servo` **v3.0.9** (recommended)
    - `Adafruit SSD1306`
    - `Adafruit GFX Library`
+   - **For direct-PWM boards** (Lolin S2 Mini, Distro Board V1/V2):
+     - `ESP32Servo` **v3.0.9** (recommended)
+   - **For camera boards** (ESP32-CAM, ESP32-S3-CAM):
+     - `Adafruit PWM Servo Driver Library` (`Adafruit_PWMServoDriver`)
 
 > [!IMPORTANT]
-> Use **ESP32Servo v3.0.9** for this project. Newer releases currently have a known issue where writing to one servo can affect multiple channels ([madhephaestus/ESP32Servo#103](https://github.com/madhephaestus/ESP32Servo/issues/103)).
+> Use **ESP32Servo v3.0.9** for direct-PWM boards. Newer releases currently have a known issue where writing to one servo can affect multiple channels ([madhephaestus/ESP32Servo#103](https://github.com/madhephaestus/ESP32Servo/issues/103)).
+> Camera boards (ESP32-CAM, ESP32-S3-CAM) use PCA9685 instead of ESP32Servo and are not affected.
 
 ### Flashing Steps
 1. **Connect your board** via USB to your computer
@@ -55,6 +59,8 @@ This document provides technical information on the firmware architecture, contr
    - For Lolin S2 Mini: Select "LOLIN S2 Mini"
    - For Sesame Distro Board V1: Select "ESP32 Dev Module"
    - For Sesame Distro Board V2: Select "ESP32S3 Dev Module"
+   - **For ESP32-CAM**: Select "AI Thinker ESP32-CAM"
+   - **For ESP32-S3-CAM**: Select "ESP32S3 Dev Module" (or the specific module variant)
 4. **Configure board settings**:
    - **For Lolin S2 Mini**:
      - **Upload Speed**: 921600
@@ -64,13 +70,24 @@ This document provides technical information on the firmware architecture, contr
      - **USB CDC On Boot**: "Enabled" (Required for Serial Monitor)
      - **Flash Mode**: "QIO 80MHz"
      - **Partition Scheme**: "Default 4MB with spiffs"
+   - **For ESP32-CAM**:
+     - **Upload Speed**: 115200
+     - **Flash Mode**: "DIO"
+     - **Partition Scheme**: "Huge APP (3MB No OTA/1MB SPIFFS)"
 5. **Select the correct port**:
    - Go to **Tools → Port** and select your ESP32's COM port
 6. **Choose your board configuration** in the code:
    - Open [sesame-firmware-main.ino](sesame-firmware-main.ino)
-   - Find the pin configuration section (around line 55-65)
-   - **If you built with the Lolin S2 Mini:** Uncomment the S2 Mini `servoPins` array and `I2C_SDA`/`I2C_SCL` defines. Comment out the Distro Board section.
-   - **If you built with the Distro Board V1 or V2 and ESP32-DevKitC-32E:** Uncomment the Distro Board `servoPins` array and `I2C_SDA`/`I2C_SCL` defines. Comment out the S2 Mini section. (V1 and V2 use the same pin configuration)
+   - Find the **Board Selection** block at the very top of the file (lines 1-10)
+   - Uncomment **only** the `#define` that matches your board (leave the rest commented):
+     ```cpp
+     // #define BOARD_ESP32CAM        // AI-Thinker ESP32-CAM
+     // #define BOARD_ESP32S3CAM      // Generic ESP32-S3-CAM (placeholder)
+     // #define BOARD_DISTRO_V2       // Sesame Distro Board V2
+     // #define BOARD_DISTRO_V1       // Sesame Distro Board V1
+     // (leave all commented = Lolin S2 Mini default)
+     ```
+   - For camera boards (ESP32-CAM, ESP32-S3-CAM) also attach a **PCA9685** breakout to GPIO 26 (SDA) / GPIO 27 (SCL) — see [hal/README.md](hal/README.md) for wiring details.
 7. **(Optional) Configure network mode**:
    - If you want the robot to connect to your WiFi network (for API access and remote control), edit the network configuration section (around line 17-22):
    ```cpp
@@ -653,11 +670,11 @@ scheduleNextIdleBlink(3000, 7000);  // Min and max ms between blinks
 
 ## Hardware Abstraction Layer (HAL)
 
-The firmware abstracts pin definitions via the `servoPins` array. The default configuration is optimized for the **Sesame Distro Board V1/V2** and **Lolin S2 Mini**, but is easily portable to any ESP32 with WiFi capability (e.g., S3, C3, or DevKit V1).
+Pin and peripheral definitions are now centralized in the [`hal/`](hal/) folder.  Including `hal/hal.h` selects the correct configuration based on the `BOARD_*` macro defined at the top of `sesame-firmware-main.ino`.  See **[hal/README.md](hal/README.md)** for full wiring details and rationale.
 
 ### Pin Configuration Tables
 
-#### Lolin S2 Mini (ESP32-S2)
+#### Lolin S2 Mini (ESP32-S2) — `BOARD_LOLIN_S2_MINI` (default)
 
 | Motor/Component | Array Index | GPIO Pin | Notes |
 |-----------------|-------------|----------|-------|
@@ -672,7 +689,7 @@ The firmware abstracts pin definitions via the `servoPins` array. The default co
 | **I2C SDA** | - | **33** | SSD1306 Data (Hardware I2C) |
 | **I2C SCL** | - | **35** | SSD1306 Clock (Hardware I2C) |
 
-#### Sesame Distro Board V1 & V2 (ESP32-WROOM32)
+#### Sesame Distro Board V1 & V2 (ESP32-WROOM32) — `BOARD_DISTRO_V1` / `BOARD_DISTRO_V2`
 
 > [!NOTE]
 > Both V1 and V2 Distro Boards use the same pin configuration.
@@ -690,9 +707,42 @@ The firmware abstracts pin definitions via the `servoPins` array. The default co
 | **I2C SDA** | - | **21** | SSD1306 Data (Hardware I2C) |
 | **I2C SCL** | - | **22** | SSD1306 Clock (Hardware I2C) |
 
+#### AI-Thinker ESP32-CAM — `BOARD_ESP32CAM`
+
+Servos are driven via a **PCA9685** I2C PWM driver.  The camera SCCB bus (GPIO 26/27) is reused for I2C, which keeps all SD-card pins free.
+
+| Component       | GPIO / Value | Notes |
+|-----------------|--------------|-------|
+| **I2C SDA**     | **26**       | Camera SCCB SIOD — shared with OV2640 (addr 0x30) |
+| **I2C SCL**     | **27**       | Camera SCCB SIOC |
+| PCA9685 address | 0x40         | Default (A0–A5 all LOW) |
+| PCA9685 ch 0–7  | —            | R1–L4 servo outputs |
+| SD_DATA0        | 2            | Preserved — not used by HAL |
+| SD_DATA1        | 4            | Preserved — not used by HAL |
+| SD_DATA2        | 12           | Preserved — not used by HAL |
+| SD_DATA3        | 13           | Preserved — not used by HAL |
+| SD_CLK          | 14           | Preserved — not used by HAL |
+| SD_CMD          | 15           | Preserved — not used by HAL |
+
+#### Generic ESP32-S3-CAM — `BOARD_ESP32S3CAM` (placeholder)
+
+> [!WARNING]
+> This is a placeholder — verify GPIO numbers against your specific board's schematic.
+
+| Component       | GPIO / Value | Notes |
+|-----------------|--------------|-------|
+| **I2C SDA**     | **8**        | Common ESP32-S3 default — update if needed |
+| **I2C SCL**     | **9**        | Common ESP32-S3 default — update if needed |
+| PCA9685 address | 0x40         | Default (A0–A5 all LOW) |
+| PCA9685 ch 0–7  | —            | R1–L4 servo outputs |
+
+### Adding Support for a New Board
+
+To port to a new ESP32 variant, add a new `board_<name>.h` header inside the `hal/` folder defining `I2C_SDA`, `I2C_SCL`, and `USE_PCA9685`, then register it in `hal/hal.h`.  Ensure the chosen pins are output-capable, not strapping-critical, and not shared with peripherals already in use.
+
 ### Porting to Other ESP32 Variants
 
-To port this to a different ESP32 variant, modify the `servoPins` and `I2C_` defines in the header of [sesame-firmware-main.ino](sesame-firmware-main.ino). Ensure the chosen pins are PWM-capable and not "input-only".
+To port this to a different ESP32 variant, add a new board header in `hal/` and uncomment the matching `BOARD_*` define at the top of [sesame-firmware-main.ino](sesame-firmware-main.ino). Ensure the chosen pins are PWM-capable (for direct servo boards) or output-capable (for PCA9685 boards) and not "input-only".
 
 ## Asset Pipeline & Face Customization
 
