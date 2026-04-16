@@ -33,14 +33,25 @@ arduino-cli compile --build-property "compiler.cpp.extra_flags=-DBOARD_ESP32CAM"
 
 #### I2C bus
 
-The OV2640 camera module is wired to the ESP32's SCCB (Serial Camera Control Bus) on **GPIO 26 (SIOD / SDA)** and **GPIO 27 (SIOC / SCL)**.  SCCB is I2C-compatible and the bus is idle except during brief camera-sensor configuration windows.  The PCA9685 PWM driver (I2C address **0x40**) is placed on this same bus; it does not conflict with the OV2640 sensor (address **0x30**).
+GPIO 26 (SIOD) and GPIO 27 (SIOC) are the OV2640 camera SCCB lines.  They are routed only to the camera FFC connector on the PCB and **are not exposed on the external J2/J3 header pins**, so an external device cannot be physically connected to them.
 
-> **Why not use other pins?**
-> The only other freely-usable exposed GPIOs on this module are
-> GPIO 1/3 (serial TX/RX), GPIO 0 (boot-strapping), and the SD-card
-> lines (GPIO 2, 4, 12, 13, 14, 15).  Reusing the existing camera SCCB
-> bus avoids touching any of those, preserving serial and SD-card
-> capabilities.
+The accessible header GPIO pins on this board are:
+
+| Header | Pins |
+|--------|------|
+| J3 | 5V · GND · IO12 · IO13 · IO15 · IO14 · IO2 · IO4 |
+| J2 | 3V3 · GND · IO16 · IO0 · IO3(RX) · IO1(TX) · GND · 5V |
+
+After excluding boot-strapping pins (GPIO 0, 2, 12), serial lines (GPIO 1, 3), the flash-LED pin (GPIO 4), and the PSRAM CS pin (GPIO 16), the only viable I2C candidates are **GPIO 13, 14, and 15**.
+
+Chosen mapping:
+
+| Signal  | GPIO | Rationale |
+|---------|------|-----------|
+| I2C SDA | **14** | SD_CLK — no boot constraint, physically accessible on J3 |
+| I2C SCL | **15** | SD_CMD — internal pull-up keeps it HIGH at boot, matching I2C idle state |
+
+> **Trade-off:** GPIO 14 (SD_CLK) and GPIO 15 (SD_CMD) are consumed by I2C, so the SD card cannot operate simultaneously. The four SD data lines — GPIO 2, 4, 12, and 13 — are preserved. SD support can be re-enabled by switching the board back to a direct-PWM configuration.
 
 #### Servo driver
 
@@ -55,18 +66,16 @@ PCA9685 pulse-width tick counts at 50 Hz (4096 ticks = 20 ms period):
 
 These match the `732–2929 µs` range used by `ESP32Servo` on legacy boards.
 
-#### SD-card pins (preserved)
+#### SD-card pins
 
-All SD/MMC pins are left untouched by this HAL and are available for future use:
-
-| Signal    | GPIO |
-|-----------|------|
-| SD_DATA0  |  2   |
-| SD_DATA1  |  4   |
-| SD_DATA2  | 12   |
-| SD_DATA3  | 13   |
-| SD_CLK    | 14   |
-| SD_CMD    | 15   |
+| Signal    | GPIO | Status with this HAL |
+|-----------|------|----------------------|
+| SD_DATA0  |  2   | Preserved            |
+| SD_DATA1  |  4   | Preserved            |
+| SD_DATA2  | 12   | Preserved            |
+| SD_DATA3  | 13   | Preserved            |
+| SD_CLK    | 14   | **Used as I2C SDA**  |
+| SD_CMD    | 15   | **Used as I2C SCL**  |
 
 #### Strapping pins (do not reassign)
 
@@ -79,13 +88,12 @@ All SD/MMC pins are left untouched by this HAL and are available for future use:
 
 #### Pin summary
 
-| Signal         | GPIO | Notes                              |
-|----------------|------|------------------------------------|
-| I2C SDA        |  26  | Camera SCCB SIOD — shared bus      |
-| I2C SCL        |  27  | Camera SCCB SIOC — shared bus      |
-| PCA9685 addr   | 0x40 | Default A0–A5 = LOW                |
-| OV2640 addr    | 0x30 | Read-only reference — no conflict  |
-| Servo driver   | PCA9685 channels 0–7              |
+| Signal         | GPIO | Notes                                      |
+|----------------|------|--------------------------------------------|
+| I2C SDA        |  14  | J3 header — SD_CLK repurposed              |
+| I2C SCL        |  15  | J3 header — SD_CMD repurposed              |
+| PCA9685 addr   | 0x40 | Default A0–A5 = LOW                        |
+| Servo driver   | PCA9685 channels 0–7                       ||
 
 ---
 
@@ -135,10 +143,10 @@ The `servoPins[]` array for these boards is still defined in the main sketch.
 ## PCA9685 wiring
 
 ```
-ESP32-CAM               PCA9685 breakout
+ESP32-CAM (J3 header)   PCA9685 breakout
 ──────────────────────  ──────────────────────
-GPIO 26 (SDA)  ──────►  SDA
-GPIO 27 (SCL)  ──────►  SCL
+GPIO 14 (SDA)  ──────►  SDA
+GPIO 15 (SCL)  ──────►  SCL
 3.3 V  ────────────────  VCC  (logic supply)
 GND    ────────────────  GND
                          V+   ← external 5–6 V servo supply

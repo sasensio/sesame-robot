@@ -709,20 +709,20 @@ Pin and peripheral definitions are now centralized in the [`hal/`](hal/) folder.
 
 #### AI-Thinker ESP32-CAM — `BOARD_ESP32CAM`
 
-Servos are driven via a **PCA9685** I2C PWM driver.  The camera SCCB bus (GPIO 26/27) is reused for I2C, which keeps all SD-card pins free.
+Servos are driven via a **PCA9685** I2C PWM driver.  GPIO 26/27 (camera SCCB) are internal to the PCB and not exposed on the headers, so I2C is placed on **GPIO 14 (SDA) / GPIO 15 (SCL)** — the only header-accessible pins without boot-strapping conflicts.
 
 | Component       | GPIO / Value | Notes |
 |-----------------|--------------|-------|
-| **I2C SDA**     | **26**       | Camera SCCB SIOD — shared with OV2640 (addr 0x30) |
-| **I2C SCL**     | **27**       | Camera SCCB SIOC |
+| **I2C SDA**     | **14**       | J3 header — SD_CLK repurposed for I2C |
+| **I2C SCL**     | **15**       | J3 header — SD_CMD repurposed; built-in pull-up ensures HIGH at boot |
 | PCA9685 address | 0x40         | Default (A0–A5 all LOW) |
 | PCA9685 ch 0–7  | —            | R1–L4 servo outputs |
 | SD_DATA0        | 2            | Preserved — not used by HAL |
 | SD_DATA1        | 4            | Preserved — not used by HAL |
 | SD_DATA2        | 12           | Preserved — not used by HAL |
 | SD_DATA3        | 13           | Preserved — not used by HAL |
-| SD_CLK          | 14           | Preserved — not used by HAL |
-| SD_CMD          | 15           | Preserved — not used by HAL |
+| SD_CLK          | 14           | **Used as I2C SDA** — SD and I2C are mutually exclusive |
+| SD_CMD          | 15           | **Used as I2C SCL** — SD and I2C are mutually exclusive |
 
 #### Generic ESP32-S3-CAM — `BOARD_ESP32S3CAM` (placeholder)
 
