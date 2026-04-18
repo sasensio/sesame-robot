@@ -1,9 +1,24 @@
+// ── Board Selection ───────────────────────────────────────────────────────────
+// Uncomment the line that matches your hardware before flashing.
+// Leave all lines commented out to default to the Lolin S2 Mini.
+//
+// #define BOARD_ESP32CAM        // AI-Thinker ESP32-CAM  (uses PCA9685 servos)
+// #define BOARD_ESP32S3CAM      // Generic ESP32-S3-CAM  (uses PCA9685 servos)
+// #define BOARD_DISTRO_V2       // Sesame Distro Board V2 (ESP32-S3)
+// #define BOARD_DISTRO_V1       // Sesame Distro Board V1 (ESP32-WROOM32)
+// ─────────────────────────────────────────────────────────────────────────────
+#include "hal/hal.h"
+
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <ESPmDNS.h>
 #include <Wire.h>
-#include <ESP32Servo.h>
+#if USE_PCA9685
+  #include <Adafruit_PWMServoDriver.h>
+#else
+  #include <ESP32Servo.h>
+#endif
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "face-bitmaps.h"
@@ -26,19 +41,6 @@
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 #define OLED_I2C_ADDR 0x3C
-
-// I2C Pins for Distro Board V2
-//#define I2C_SDA 8
-//#define I2C_SCL 9
-
-// I2C Pins for Distro Board
-//#define I2C_SDA 21
-//#define I2C_SCL 22
-
-// I2C Pins for S2 Mini Board
-#define I2C_SDA 33
-#define I2C_SCL 35
-
 
 // DNS Server for Captive Portal
 DNSServer dnsServer;
@@ -77,20 +79,25 @@ bool networkConnected = false;
 IPAddress networkIP;
 String deviceHostname = "sesame-robot";
 
-// Servo Pins for Distro Board
-// ======================================================================
-// Pin numbers are coorisponding to the ESP32 GPIO pins and may differ based on which board you use.
-// If you are using a different board, please adjust the servoPins array accordingly.
-// ======================================================================
-Servo servos[8];
-// Sesame Distro Board V2 Pinout
-//const int servoPins[8] = {4, 5, 6, 7, 15, 16, 17, 18};
+// ── Servo / PCA9685 ──────────────────────────────────────────────────────────
+// Pin numbers correspond to ESP32 GPIO pins and differ between boards.
+// For PCA9685 boards (ESP32-CAM, ESP32-S3-CAM) the driver is initialised in
+// setup(); servo channels 0-7 map directly to PCA9685 outputs 0-7.
+// For direct-PWM boards the servoPins array selects the GPIO for each channel.
+// ─────────────────────────────────────────────────────────────────────────────
+#if USE_PCA9685
+  Adafruit_PWMServoDriver pwmDriver = Adafruit_PWMServoDriver(PCA9685_I2C_ADDR);
+#else
+  Servo servos[8];
+  // Sesame Distro Board V2 Pinout
+  //const int servoPins[8] = {4, 5, 6, 7, 15, 16, 17, 18};
 
-// Sesame Distro Board Pinout
-//const int servoPins[8] = {15, 2, 23, 19, 4, 16, 17, 18};
+  // Sesame Distro Board Pinout
+  //const int servoPins[8] = {15, 2, 23, 19, 4, 16, 17, 18};
 
-// Lolin S2 Mini Pinout
-const int servoPins[8] = {1, 2, 4, 6, 8, 10, 13, 14};
+  // Lolin S2 Mini Pinout
+  const int servoPins[8] = {1, 2, 4, 6, 8, 10, 13, 14};
+#endif
 
 // Subtrim values for each servo (offset in degrees)
 int8_t servoSubtrim[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -459,7 +466,15 @@ void setup() {
   
   server.begin();
 
-  // PWM Init
+  // PWM / Servo Init
+#if USE_PCA9685
+  pwmDriver.begin();
+  // Use the measured oscillator frequency for accurate pulse widths.
+  // 27 MHz is a typical value for the PCA9685 on-board oscillator;
+  // calibrate with an oscilloscope if precise timing is required.
+  pwmDriver.setOscillatorFrequency(27000000);
+  pwmDriver.setPWMFreq(50);  // 50 Hz servo standard
+#else
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
   ESP32PWM::allocateTimer(2);
@@ -470,6 +485,7 @@ void setup() {
     // Map 0-180 to approx 732-2929us
     servos[i].attach(servoPins[i], 732, 2929);
   }
+#endif
   delay(10);
   
   // Show rest face on startup without moving motors
@@ -768,7 +784,13 @@ void updateIdleBlink() {
 void setServoAngle(uint8_t channel, int angle) { 
   if (channel < 8) {
     int adjustedAngle = constrain(angle + servoSubtrim[channel], 0, 180);
+#if USE_PCA9685
+    // Map 0-180° to PCA9685 tick counts (matches 732-2929 µs pulse range).
+    int ticks = map(adjustedAngle, 0, 180, PCA9685_SERVOMIN, PCA9685_SERVOMAX);
+    pwmDriver.setPWM(channel, 0, ticks);
+#else
     servos[channel].write(adjustedAngle);
+#endif
     delayWithFace(motorCurrentDelay);
   }
 }
