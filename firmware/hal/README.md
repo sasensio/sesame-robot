@@ -92,6 +92,7 @@ These match the `732–2929 µs` range used by `ESP32Servo` on legacy boards.
 |----------------|------|--------------------------------------------|
 | I2C SDA        |  14  | J3 header — SD_CLK repurposed              |
 | I2C SCL        |  15  | J3 header — SD_CMD repurposed              |
+| CAM LED        |   4  | On-board flash LED (web-toggle capable)    |
 | PCA9685 addr   | 0x40 | Default A0–A5 = LOW                        |
 | Servo driver   | PCA9685 channels 0–7                       ||
 

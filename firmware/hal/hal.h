@@ -51,3 +51,11 @@
 #ifndef USE_PCA9685
   #define USE_PCA9685 0
 #endif
+
+#ifndef HAS_CAMERA
+  #define HAS_CAMERA 0
+#endif
+
+#ifndef CAM_PIN_LED
+  #define CAM_PIN_LED -1
+#endif

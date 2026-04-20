@@ -69,8 +69,30 @@
 #define USE_PCA9685        1
 #define PCA9685_I2C_ADDR   0x40
 
-// Pulse-width tick counts for the PCA9685 at 50 Hz (4096 ticks = 20 ms).
-// Formula: ticks = pulse_µs / (20000 / 4096) = pulse_µs * 4096 / 20000
-// Chosen to match the 732–2929 µs range used by the existing ESP32Servo code.
-#define PCA9685_SERVOMIN   150   //  ≈  732 µs  (150 * 20000 / 4096)
-#define PCA9685_SERVOMAX   600   //  ≈ 2929 µs  (600 * 20000 / 4096)
+// Pulse-width tick counts for the PCA9685 (27 MHz oscillator, prescale 131).
+// Actual period ≈ 20.024 ms → 4.889 µs/tick.
+// Conservative range matching MF90 datasheet: 500–2500 µs.
+#define PCA9685_SERVOMIN   102   //  ≈  500 µs  (102 × 4.889 µs)
+#define PCA9685_SERVOMAX   511   //  ≈ 2500 µs  (511 × 4.889 µs)
+
+// ── Camera (OV2640) ──────────────────────────────────────────────────────────
+#define HAS_CAMERA         1
+#define CAM_PIN_PWDN       32
+#define CAM_PIN_RESET      -1
+#define CAM_PIN_XCLK        0
+#define CAM_PIN_SIOD       26
+#define CAM_PIN_SIOC       27
+#define CAM_PIN_D7         35
+#define CAM_PIN_D6         34
+#define CAM_PIN_D5         39
+#define CAM_PIN_D4         36
+#define CAM_PIN_D3         21
+#define CAM_PIN_D2         19
+#define CAM_PIN_D1         18
+#define CAM_PIN_D0          5
+#define CAM_PIN_VSYNC      25
+#define CAM_PIN_HREF       23
+#define CAM_PIN_PCLK       22
+
+// On-board white LED (flash LED) on AI-Thinker ESP32-CAM.
+#define CAM_PIN_LED         4

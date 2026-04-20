@@ -190,11 +190,26 @@ const char index_html[] PROGMEM = R"rawliteral(
       margin: 15px 0;
     }
     .motor-slider label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
+      font-size: 13px;
       color: #aaa;
-      margin-bottom: 5px;
+      margin-bottom: 4px;
+      display: block;
+    }
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .slider-wrap input[type="range"] {
+      flex: 1;
+    }
+    .slider-wrap .angle-val {
+      min-width: 42px;
+      text-align: right;
+      color: #fb0;
+      font-weight: bold;
+      font-size: 14px;
+      white-space: nowrap;
     }
     .motor-slider input[type="range"] {
       width: 100%;
@@ -230,6 +245,52 @@ const char index_html[] PROGMEM = R"rawliteral(
     .motor-slider input[type="range"]:disabled::-moz-range-thumb {
       background: #666;
       cursor: not-allowed;
+    }
+    .cal-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    .cal-row input[type="number"] {
+      width: 54px;
+      background: #222;
+      border: 1px solid #444;
+      color: #eee;
+      border-radius: 4px;
+      padding: 3px 4px;
+      font-size: 12px;
+      text-align: center;
+    }
+    .cal-row .cal-btn, .angle-row .cal-btn {
+      background: #333;
+      border: 1px solid #555;
+      color: #f90;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .cal-row .cal-btn:active, .angle-row .cal-btn:active { background: #555; }
+    .angle-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 2px;
+      font-size: 11px;
+      color: #8cf;
+    }
+    .angle-row input[type="number"] {
+      width: 64px;
+      background: #222;
+      border: 1px solid #446;
+      color: #8cf;
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 12px;
+      text-align: center;
     }
     
     /* Gamepad Status */
@@ -362,10 +423,35 @@ const char index_html[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <h2>Sesame Controller</h2>
+  <div id="connBar" style="display:flex;justify-content:center;align-items:center;gap:12px;font-size:11px;color:#aaa;margin:-4px 0 8px 0;">
+    <span id="connDot" style="width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;"></span>
+    <span id="connText">Connecting...</span>
+    <span id="connMode" style="color:#666;"></span>
+    <span id="connRSSI" style="color:#666;"></span>
+  </div>
   <div class="command-queue" id="queueStatus">Command Queue: 0/3</div>
   
   <div class="sections-container">
     <div class="section-column">
+      <!-- Camera Feed Section -->
+      <div class="section" id="cameraSection">
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Camera Feed <span id="camFps" style="font-size:11px;color:#888;font-weight:normal;"></span></span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:normal;color:#aaa;">
+              <input type="checkbox" id="cameraToggle" checked style="width:16px;height:16px;accent-color:var(--content-color);" onchange="toggleCamera(this.checked)">
+              On
+            </label>
+            <label id="camLedWrap" style="display:none;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:normal;color:#aaa;">
+              <input type="checkbox" id="cameraLedToggle" style="width:16px;height:16px;accent-color:var(--content-color);" onchange="toggleCamLed(this.checked)">
+              LED
+            </label>
+          </div>
+        </div>
+        <img id="cameraStream" style="width:100%;border-radius:8px;background:#111;display:none;" alt="Camera">
+        <div id="camOff" style="display:none;padding:20px;color:#666;font-size:13px;">Camera off — saves ~40mA</div>
+      </div>
+
       <!-- Movement Control Section -->
       <div class="section">
     <div class="section-title">Movement Control</div>
@@ -459,6 +545,16 @@ const char index_html[] PROGMEM = R"rawliteral(
         <input type="color" id="customColor" value="#ff8c42" style="margin-top: 10px; display: none;">
       </div>
 
+      <div class="settings-section">
+        <h4>WiFi Network</h4>
+        <div id="wifiStatus" style="font-size:11px;color:#8cf;margin-bottom:8px;"></div>
+        <label>SSID:</label>
+        <input type="text" id="staSSID" maxlength="32" placeholder="Your WiFi name" style="width:100%;background:#222;border:1px solid #444;color:#eee;border-radius:4px;padding:6px;font-size:13px;">
+        <label>Password:</label>
+        <input type="password" id="staPass" maxlength="63" placeholder="WiFi password" style="width:100%;background:#222;border:1px solid #444;color:#eee;border-radius:4px;padding:6px;font-size:13px;">
+        <button class="btn-save" style="width:100%;margin-top:10px;" onclick="saveWifi()">Save WiFi &amp; Reboot</button>
+      </div>
+
       <button class="btn-settings" style="width: 100%; margin-top: 20px;" onclick="openMotorControl()">Manual Motor Control</button>
 
       <button class="btn-save" onclick="saveSettings()">Save Settings</button>
@@ -474,40 +570,58 @@ const char index_html[] PROGMEM = R"rawliteral(
       <div class="settings-section">
         <div class="motor-controls">
           <div class="motor-slider">
-            <label><span>S0 R1</span><span id="m1val">90&deg;</span></label>
-            <input type="range" id="motor1" min="0" max="180" value="90" oninput="updateMotor(1, this.value)">
+            <label>R1 (ch0)</label>
+            <div class="slider-wrap"><input type="range" id="motor1" min="0" max="180" value="90" oninput="updateMotor('R1', this.value, 1)"><span class="angle-val" id="m1val">90&deg;</span></div>
+            <div class="cal-row"><button class="cal-btn" onclick="setCalFromSlider(0,'min')">Set Min</button><input type="number" id="cal0min" min="500" max="2499" value="500" onchange="setCal(0)">&micro;s &ndash; <input type="number" id="cal0max" min="501" max="2500" value="2500" onchange="setCal(0)">&micro;s<button class="cal-btn" onclick="setCalFromSlider(0,'max')">Set Max</button></div>
+            <div class="angle-row"><button class="cal-btn" onclick="setAngleLimitFromSlider(0,'min')">Set Min</button><input type="number" id="ang0min" min="0" max="179" value="0" onchange="setCal(0)">&deg; &ndash; <input type="number" id="ang0max" min="1" max="180" value="180" onchange="setCal(0)">&deg;<button class="cal-btn" onclick="setAngleLimitFromSlider(0,'max')">Set Max</button></div>
           </div>
           <div class="motor-slider">
-            <label><span>S1 R2</span><span id="m2val">90&deg;</span></label>
-            <input type="range" id="motor2" min="0" max="180" value="90" oninput="updateMotor(2, this.value)">
+            <label>R2 (ch1)</label>
+            <div class="slider-wrap"><input type="range" id="motor2" min="0" max="180" value="90" oninput="updateMotor('R2', this.value, 2)"><span class="angle-val" id="m2val">90&deg;</span></div>
+            <div class="cal-row"><button class="cal-btn" onclick="setCalFromSlider(1,'min')">Set Min</button><input type="number" id="cal1min" min="500" max="2499" value="500" onchange="setCal(1)">&micro;s &ndash; <input type="number" id="cal1max" min="501" max="2500" value="2500" onchange="setCal(1)">&micro;s<button class="cal-btn" onclick="setCalFromSlider(1,'max')">Set Max</button></div>
+            <div class="angle-row"><button class="cal-btn" onclick="setAngleLimitFromSlider(1,'min')">Set Min</button><input type="number" id="ang1min" min="0" max="179" value="0" onchange="setCal(1)">&deg; &ndash; <input type="number" id="ang1max" min="1" max="180" value="180" onchange="setCal(1)">&deg;<button class="cal-btn" onclick="setAngleLimitFromSlider(1,'max')">Set Max</button></div>
           </div>
           <div class="motor-slider">
-            <label><span>S2 L1</span><span id="m3val">90&deg;</span></label>
-            <input type="range" id="motor3" min="0" max="180" value="90" oninput="updateMotor(3, this.value)">
+            <label>L1 (ch2)</label>
+            <div class="slider-wrap"><input type="range" id="motor3" min="0" max="180" value="90" oninput="updateMotor('L1', this.value, 3)"><span class="angle-val" id="m3val">90&deg;</span></div>
+            <div class="cal-row"><button class="cal-btn" onclick="setCalFromSlider(2,'min')">Set Min</button><input type="number" id="cal2min" min="500" max="2499" value="500" onchange="setCal(2)">&micro;s &ndash; <input type="number" id="cal2max" min="501" max="2500" value="2500" onchange="setCal(2)">&micro;s<button class="cal-btn" onclick="setCalFromSlider(2,'max')">Set Max</button></div>
+            <div class="angle-row"><button class="cal-btn" onclick="setAngleLimitFromSlider(2,'min')">Set Min</button><input type="number" id="ang2min" min="0" max="179" value="0" onchange="setCal(2)">&deg; &ndash; <input type="number" id="ang2max" min="1" max="180" value="180" onchange="setCal(2)">&deg;<button class="cal-btn" onclick="setAngleLimitFromSlider(2,'max')">Set Max</button></div>
           </div>
           <div class="motor-slider">
-            <label><span>S3 L2</span><span id="m4val">90&deg;</span></label>
-            <input type="range" id="motor4" min="0" max="180" value="90" oninput="updateMotor(4, this.value)">
+            <label>L2 (ch3)</label>
+            <div class="slider-wrap"><input type="range" id="motor4" min="0" max="180" value="90" oninput="updateMotor('L2', this.value, 4)"><span class="angle-val" id="m4val">90&deg;</span></div>
+            <div class="cal-row"><button class="cal-btn" onclick="setCalFromSlider(3,'min')">Set Min</button><input type="number" id="cal3min" min="500" max="2499" value="500" onchange="setCal(3)">&micro;s &ndash; <input type="number" id="cal3max" min="501" max="2500" value="2500" onchange="setCal(3)">&micro;s<button class="cal-btn" onclick="setCalFromSlider(3,'max')">Set Max</button></div>
+            <div class="angle-row"><button class="cal-btn" onclick="setAngleLimitFromSlider(3,'min')">Set Min</button><input type="number" id="ang3min" min="0" max="179" value="0" onchange="setCal(3)">&deg; &ndash; <input type="number" id="ang3max" min="1" max="180" value="180" onchange="setCal(3)">&deg;<button class="cal-btn" onclick="setAngleLimitFromSlider(3,'max')">Set Max</button></div>
           </div>
           <div class="motor-slider">
-            <label><span>S4 R4</span><span id="m5val">90&deg;</span></label>
-            <input type="range" id="motor5" min="0" max="180" value="90" oninput="updateMotor(5, this.value)">
+            <label>R4 (ch4)</label>
+            <div class="slider-wrap"><input type="range" id="motor5" min="0" max="180" value="90" oninput="updateMotor('R4', this.value, 5)"><span class="angle-val" id="m5val">90&deg;</span></div>
+            <div class="cal-row"><button class="cal-btn" onclick="setCalFromSlider(4,'min')">Set Min</button><input type="number" id="cal4min" min="500" max="2499" value="500" onchange="setCal(4)">&micro;s &ndash; <input type="number" id="cal4max" min="501" max="2500" value="2500" onchange="setCal(4)">&micro;s<button class="cal-btn" onclick="setCalFromSlider(4,'max')">Set Max</button></div>
+            <div class="angle-row"><button class="cal-btn" onclick="setAngleLimitFromSlider(4,'min')">Set Min</button><input type="number" id="ang4min" min="0" max="179" value="0" onchange="setCal(4)">&deg; &ndash; <input type="number" id="ang4max" min="1" max="180" value="180" onchange="setCal(4)">&deg;<button class="cal-btn" onclick="setAngleLimitFromSlider(4,'max')">Set Max</button></div>
           </div>
           <div class="motor-slider">
-            <label><span>S5 R3</span><span id="m6val">90&deg;</span></label>
-            <input type="range" id="motor6" min="0" max="180" value="90" oninput="updateMotor(6, this.value)">
+            <label>R3 (ch5)</label>
+            <div class="slider-wrap"><input type="range" id="motor6" min="0" max="180" value="90" oninput="updateMotor('R3', this.value, 6)"><span class="angle-val" id="m6val">90&deg;</span></div>
+            <div class="cal-row"><button class="cal-btn" onclick="setCalFromSlider(5,'min')">Set Min</button><input type="number" id="cal5min" min="500" max="2499" value="500" onchange="setCal(5)">&micro;s &ndash; <input type="number" id="cal5max" min="501" max="2500" value="2500" onchange="setCal(5)">&micro;s<button class="cal-btn" onclick="setCalFromSlider(5,'max')">Set Max</button></div>
+            <div class="angle-row"><button class="cal-btn" onclick="setAngleLimitFromSlider(5,'min')">Set Min</button><input type="number" id="ang5min" min="0" max="179" value="0" onchange="setCal(5)">&deg; &ndash; <input type="number" id="ang5max" min="1" max="180" value="180" onchange="setCal(5)">&deg;<button class="cal-btn" onclick="setAngleLimitFromSlider(5,'max')">Set Max</button></div>
           </div>
           <div class="motor-slider">
-            <label><span>S6 L3</span><span id="m7val">90&deg;</span></label>
-            <input type="range" id="motor7" min="0" max="180" value="90" oninput="updateMotor(7, this.value)">
+            <label>L3 (ch6)</label>
+            <div class="slider-wrap"><input type="range" id="motor7" min="0" max="180" value="90" oninput="updateMotor('L3', this.value, 7)"><span class="angle-val" id="m7val">90&deg;</span></div>
+            <div class="cal-row"><button class="cal-btn" onclick="setCalFromSlider(6,'min')">Set Min</button><input type="number" id="cal6min" min="500" max="2499" value="500" onchange="setCal(6)">&micro;s &ndash; <input type="number" id="cal6max" min="501" max="2500" value="2500" onchange="setCal(6)">&micro;s<button class="cal-btn" onclick="setCalFromSlider(6,'max')">Set Max</button></div>
+            <div class="angle-row"><button class="cal-btn" onclick="setAngleLimitFromSlider(6,'min')">Set Min</button><input type="number" id="ang6min" min="0" max="179" value="0" onchange="setCal(6)">&deg; &ndash; <input type="number" id="ang6max" min="1" max="180" value="180" onchange="setCal(6)">&deg;<button class="cal-btn" onclick="setAngleLimitFromSlider(6,'max')">Set Max</button></div>
           </div>
           <div class="motor-slider">
-            <label><span>S7 L4</span><span id="m8val">90&deg;</span></label>
-            <input type="range" id="motor8" min="0" max="180" value="90" oninput="updateMotor(8, this.value)">
+            <label>L4 (ch7)</label>
+            <div class="slider-wrap"><input type="range" id="motor8" min="0" max="180" value="90" oninput="updateMotor('L4', this.value, 8)"><span class="angle-val" id="m8val">90&deg;</span></div>
+            <div class="cal-row"><button class="cal-btn" onclick="setCalFromSlider(7,'min')">Set Min</button><input type="number" id="cal7min" min="500" max="2499" value="500" onchange="setCal(7)">&micro;s &ndash; <input type="number" id="cal7max" min="501" max="2500" value="2500" onchange="setCal(7)">&micro;s<button class="cal-btn" onclick="setCalFromSlider(7,'max')">Set Max</button></div>
+            <div class="angle-row"><button class="cal-btn" onclick="setAngleLimitFromSlider(7,'min')">Set Min</button><input type="number" id="ang7min" min="0" max="179" value="0" onchange="setCal(7)">&deg; &ndash; <input type="number" id="ang7max" min="1" max="180" value="180" onchange="setCal(7)">&deg;<button class="cal-btn" onclick="setAngleLimitFromSlider(7,'max')">Set Max</button></div>
           </div>
         </div>
       </div>
 
+      <button class="btn-save" onclick="centerAllMotors()">Center All (90&deg;)</button>
+      <button class="btn-save" onclick="saveCalibration()">Save Calibration</button>
       <button class="btn-close" onclick="closeMotorControl()">Close</button>
     </div>
   </div>
@@ -617,12 +731,48 @@ function pose(name) {
   fetch('/cmd?pose=' + name).catch(console.log); 
 }
 
-function updateMotor(motorNum, value) {
+// Arrow key support for movement
+(function() {
+  const keyMap = { ArrowUp: 'forward', ArrowDown: 'backward', ArrowLeft: 'left', ArrowRight: 'right' };
+  const held = {};
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    const dir = keyMap[e.key];
+    if (dir && !held[e.key]) { held[e.key] = true; move(dir); e.preventDefault(); }
+  });
+  document.addEventListener('keyup', function(e) {
+    const dir = keyMap[e.key];
+    if (dir && held[e.key]) { delete held[e.key]; if (!Object.keys(held).length) stop(); e.preventDefault(); }
+  });
+})();
+
+let motorThrottleTimers = {};
+
+function updateMotor(name, value, sliderIdx) {
   if (motorsLocked) return;
-  document.getElementById('m' + motorNum + 'val').textContent = value + '\u00B0';
-  if (!canSendCommand()) return;
-  incrementQueue();
-  fetch('/cmd?motor=' + motorNum + '&value=' + value).catch(console.log);
+  document.getElementById('m' + sliderIdx + 'val').textContent = value + ' \u00B0';
+  // Throttle: send at most every 50ms per servo to avoid flooding
+  if (motorThrottleTimers[sliderIdx]) return;
+  motorThrottleTimers[sliderIdx] = setTimeout(() => {
+    delete motorThrottleTimers[sliderIdx];
+  }, 50);
+  fetch('/cmd?motor=' + name + '&value=' + value).catch(console.log);
+}
+
+function centerAllMotors() {
+  if (motorsLocked) return;
+  const names = ['R1','R2','L1','L2','R4','R3','L3','L4'];
+  for (let i = 0; i < 8; i++) {
+    document.getElementById('motor' + (i+1)).value = 90;
+    document.getElementById('m' + (i+1) + 'val').textContent = '90 \u00B0';
+  }
+  // Stagger in pairs of 2 with 150ms gaps to limit inrush current
+  for (let g = 0; g < 4; g++) {
+    setTimeout(() => {
+      fetch('/cmd?motor=' + names[g*2] + '&value=90').catch(console.log);
+      fetch('/cmd?motor=' + names[g*2+1] + '&value=90').catch(console.log);
+    }, g * 150);
+  }
 }
 
 function openSettings() {
@@ -631,6 +781,20 @@ function openSettings() {
     document.getElementById('walkCycles').value = data.walkCycles || 10;
     document.getElementById('motorCurrentDelay').value = data.motorCurrentDelay || 20;
     document.getElementById('motorSpeed').value = data.motorSpeed || 'medium';
+    
+    // WiFi
+    document.getElementById('staSSID').value = data.staSSID || '';
+    const ws = document.getElementById('wifiStatus');
+    if (data.networkConnected) {
+      ws.textContent = 'Connected to ' + data.staSSID + ' (' + data.networkIP + ')';
+      ws.style.color = '#2ecc71';
+    } else if (data.staEnabled) {
+      ws.textContent = 'Not connected (configured: ' + data.staSSID + ')';
+      ws.style.color = '#e74c3c';
+    } else {
+      ws.textContent = 'AP-only mode';
+      ws.style.color = '#888';
+    }
     
     // Load theme settings
     const savedColor = localStorage.getItem('themeColor') || '#ff8c42';
@@ -688,6 +852,51 @@ function closeSettings() {
 
 function openMotorControl() {
   document.getElementById('motorControlPanel').style.display = 'block';
+  fetch('/getCal').then(r => r.json()).then(data => {
+    for (let i = 0; i < 8; i++) {
+      document.getElementById('cal' + i + 'min').value = data.min[i];
+      document.getElementById('cal' + i + 'max').value = data.max[i];
+      document.getElementById('ang' + i + 'min').value = data.angleMin[i];
+      document.getElementById('ang' + i + 'max').value = data.angleMax[i];
+      if (data.pos) {
+        const angle = data.pos[i];
+        document.getElementById('motor' + (i + 1)).value = angle;
+        document.getElementById('m' + (i + 1) + 'val').textContent = angle + ' \u00B0';
+      }
+    }
+  }).catch(() => {});
+}
+
+function setCal(ch) {
+  const mn = document.getElementById('cal' + ch + 'min').value;
+  const mx = document.getElementById('cal' + ch + 'max').value;
+  const amn = document.getElementById('ang' + ch + 'min').value;
+  const amx = document.getElementById('ang' + ch + 'max').value;
+  fetch('/setCal?min' + ch + '=' + mn + '&max' + ch + '=' + mx + '&amin' + ch + '=' + amn + '&amax' + ch + '=' + amx).catch(console.log);
+}
+
+function setAngleLimitFromSlider(ch, target) {
+  const angle = parseInt(document.getElementById('motor' + (ch + 1)).value);
+  document.getElementById('ang' + ch + target).value = angle;
+  setCal(ch);
+}
+
+function setCalFromSlider(ch, target) {
+  const sliderIdx = ch + 1;
+  const angle = parseInt(document.getElementById('motor' + sliderIdx).value);
+  const mnCur = parseInt(document.getElementById('cal' + ch + 'min').value);
+  const mxCur = parseInt(document.getElementById('cal' + ch + 'max').value);
+  const us = Math.round(mnCur + (angle / 180.0) * (mxCur - mnCur));
+  document.getElementById('cal' + ch + target).value = us;
+  setCal(ch);
+}
+
+function saveCalibration() {
+  fetch('/saveCal').then(() => {
+    alert('Calibration saved to flash!');
+  }).catch(() => {
+    alert('Save failed');
+  });
 }
 
 function closeMotorControl() {
@@ -710,6 +919,19 @@ function saveSettings() {
   fetch(`/setSettings?frameDelay=${fd}&walkCycles=${wc}&motorCurrentDelay=${mcd}&motorSpeed=${ms}`)
     .then(() => closeSettings())
     .catch(() => closeSettings());
+}
+
+function saveWifi() {
+  const ssid = document.getElementById('staSSID').value.trim();
+  const pass = document.getElementById('staPass').value;
+  if (ssid.length === 0) {
+    if (!confirm('SSID is empty — this will disable WiFi station mode. Continue?')) return;
+  }
+  fetch('/setWifi?ssid=' + encodeURIComponent(ssid) + '&pass=' + encodeURIComponent(pass))
+    .then(r => r.text()).then(t => {
+      alert(t + '\\nThe robot will reboot now to apply WiFi settings.');
+      fetch('/cmd?reboot=1').catch(() => {});
+    }).catch(() => alert('Failed to save WiFi settings'));
 }
 
 let activeGamepadIndex = null;
@@ -844,6 +1066,156 @@ if (navigator.getGamepads) {
     }
   }, 1000);
 }
+// Camera stream — connect to port 81 MJPEG endpoint with FPS counter
+var camStreamActive = false;
+(function() {
+  const img = document.getElementById('cameraStream');
+  const offMsg = document.getElementById('camOff');
+  const fpsEl = document.getElementById('camFps');
+  const ledWrap = document.getElementById('camLedWrap');
+  const ledToggle = document.getElementById('cameraLedToggle');
+  const streamUrl = 'http://' + location.hostname + ':81';
+  let retryTimer = null;
+  let frameCount = 0;
+  let lastFpsTime = Date.now();
+
+  function freshStreamUrl() {
+    return streamUrl + '/?_=' + Date.now();
+  }
+
+  // FPS counter — MJPEG fires onload for each frame
+  img.onload = function() {
+    camStreamActive = true;
+    frameCount++;
+    const now = Date.now();
+    if (now - lastFpsTime >= 2000) {
+      const fps = (frameCount / ((now - lastFpsTime) / 1000)).toFixed(1);
+      fpsEl.textContent = fps + ' fps';
+      frameCount = 0;
+      lastFpsTime = now;
+    }
+  };
+
+  // Load initial camera state then connect
+  fetch('/getSettings').then(r => r.json()).then(data => {
+    const enabled = (data.cameraEnabled !== false);
+    document.getElementById('cameraToggle').checked = enabled;
+    const ledAvailable = (data.cameraLedAvailable === true);
+    ledWrap.style.display = ledAvailable ? 'flex' : 'none';
+    ledToggle.checked = (data.cameraLed === true);
+    if (enabled) {
+      startStream();
+    } else {
+      img.style.display = 'none';
+      offMsg.style.display = 'block';
+      fpsEl.textContent = '';
+    }
+  }).catch(() => startStream());
+
+  function startStream() {
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+    let retries = 3;
+    camStreamActive = false;
+    img.style.display = 'block';
+    offMsg.style.display = 'none';
+    img.src = '';
+    img.onerror = function() {
+      if (--retries > 0) {
+        retryTimer = setTimeout(() => {
+          img.src = freshStreamUrl();
+        }, 2000);
+      }
+      else { img.style.display = 'none'; offMsg.style.display = 'block'; offMsg.textContent = 'Stream unavailable'; }
+    };
+    img.src = freshStreamUrl();
+  }
+
+  window.startCamStream = startStream;
+})();
+
+function toggleCamera(on) {
+  const img = document.getElementById('cameraStream');
+  const offMsg = document.getElementById('camOff');
+  const fpsEl = document.getElementById('camFps');
+  fetch('/setSettings?camera=' + (on ? '1' : '0')).then(() => {
+    if (!on) {
+      camStreamActive = false;
+      img.onerror = null;
+      img.src = '';
+      img.style.display = 'none';
+      offMsg.style.display = 'block';
+      offMsg.textContent = 'Camera off \u2014 saves ~40mA';
+      fpsEl.textContent = '';
+    } else {
+      offMsg.style.display = 'none';
+      // Wait for firmware wake+reinit path before reconnecting MJPEG.
+      setTimeout(() => {
+        fetch('/getSettings').then(r => r.json()).then(data => {
+          if (data.cameraEnabled !== false) {
+            window.startCamStream();
+          }
+        }).catch(() => window.startCamStream());
+      }, 1300);
+    }
+  });
+}
+
+function toggleCamLed(on) {
+  fetch('/setSettings?camLed=' + (on ? '1' : '0')).catch(() => {
+    // Re-sync from firmware state on error.
+    fetch('/getSettings').then(r => r.json()).then(data => {
+      const ledToggle = document.getElementById('cameraLedToggle');
+      if (ledToggle) ledToggle.checked = (data.cameraLed === true);
+    }).catch(() => {});
+  });
+}
+
+// --- Connection heartbeat ---
+(function() {
+  const dot = document.getElementById('connDot');
+  const txt = document.getElementById('connText');
+  const mode = document.getElementById('connMode');
+  const rssi = document.getElementById('connRSSI');
+  let fails = 0;
+
+  function rssiToBar(r) {
+    if (r >= -50) return '\u2582\u2584\u2586\u2588';
+    if (r >= -60) return '\u2582\u2584\u2586\u2007';
+    if (r >= -70) return '\u2582\u2584\u2007\u2007';
+    return '\u2582\u2007\u2007\u2007';
+  }
+
+  function poll() {
+    fetch('/api/status').then(r => r.json()).then(d => {
+      fails = 0;
+      dot.style.background = '#2ecc71';
+      let info = 'Connected';
+      if (d.networkConnected) {
+        mode.textContent = 'STA+AP';
+        rssi.textContent = rssiToBar(d.rssi) + ' ' + d.rssi + 'dBm';
+        info += ' \u2022 ' + d.ssid + ' (' + d.networkIP + ')';
+      } else {
+        mode.textContent = 'AP only';
+        rssi.textContent = '';
+      }
+      if (d.apClients !== undefined) info += ' \u2022 ' + d.apClients + ' client' + (d.apClients !== 1 ? 's' : '');
+      txt.textContent = info;
+    }).catch(() => {
+      fails++;
+      if (fails >= 2) {
+        dot.style.background = '#e74c3c';
+        txt.textContent = 'Disconnected';
+        mode.textContent = '';
+        rssi.textContent = '';
+      }
+    });
+  }
+  poll();
+  setInterval(poll, 3000);
+})();
 </script>
 </body>
 </html>

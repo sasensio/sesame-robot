@@ -144,6 +144,13 @@ The firmware is built on the Arduino-ESP32 framework. Currently the firmware is 
 - **Timer Allocation**: The firmware uses `ESP32PWM::allocateTimer(n)` to reserve hardware timers 0-3. This prevents conflicts with other peripherals and ensuring high-resolution PWM signals (50Hz frequency). Due to the limited number of timers, you may experience network errors upon adding additional devices or calls to the firmware. For example, in a modded version of the robot, I tried adding two ESCs and their servo controll to the code, and the CPU ran out of internal timers and caused the captive portal to die. If you are experiencing network errors with your custom firmware, check the timer allocation.
 - **Pulse Width Mapping**: Leg servos are mapped from degrees (0-180) to microseconds (732us to 2929us). This range is set to the maximum travel on most hobby servos with a 180 degree limit, but can be edited in the `servos[i].attach()` calls. If you are using motors with a larger range of motion, like 270 degree servos, you need to set the PWM mapping to a different length of microseconds. For 270 degree servos specifically I found (833us to 2167us) works.
 - **Staggered Activation**: To prevent VCC rail collapse (brownout) caused by simultaneous inductive loads, the `setServoAngle` helper introduces a mandatory `motorCurrentDelay` (default 20ms) between sequential pulses. This delay should be tweaked to your power setup. If you have a strong dedicated power supply you can try setting it to zero. It can also be changed while running through the AP controller settings menu.
+- **PCA9685 Auto-Release (Optional)**: For camera boards, `ENABLE_SERVO_AUTO_RELEASE` can release PWM outputs in rest mode to reduce idle servo current draw. This lowers holding power usage at the cost of holding torque while resting.
+
+### Camera Stream & Recovery
+- **Toggle Recovery Path**: Turning the camera OFF deinitializes and powers down the camera driver; turning it ON powers up, reinitializes with retries, and validates frame capture before stream resume.
+- **Web Reconnect Robustness**: The web UI reconnects MJPEG with cache-busted URLs and retry cleanup to avoid stale stream sessions when toggling OFF→ON.
+- **Adaptive FPS Hold**: Camera active frame timing now remains in high-rate mode for 30 seconds after movement stops, then returns to idle-rate streaming.
+- **On-Board LED Control**: ESP32-CAM flash LED can be toggled from the web UI when supported by the selected board HAL.
 
 ### Communication & Networking Stack
 - **Dual-Mode WiFi**: The ESP32 can simultaneously operate in both Access Point mode (for direct connections) and Station mode (connected to an existing network) using `WiFi.mode(WIFI_AP_STA)`.
@@ -285,9 +292,18 @@ GET /cmd?motor=1&value=90
 #### Settings Management
 ```http
 GET /getSettings
-# Returns: {"frameDelay":100,"walkCycles":10,"motorCurrentDelay":20,"faceFps":8}
+# Returns: {"frameDelay":100,"walkCycles":10,"motorCurrentDelay":20,"faceFps":8,
+#           "cameraEnabled":true,"cameraLed":false,"cameraLedAvailable":true}
 
 GET /setSettings?frameDelay=120&walkCycles=15&motorCurrentDelay=25&faceFps=10
+
+# Camera controls
+GET /setSettings?camera=1
+GET /setSettings?camera=0
+
+# Camera LED controls (when available)
+GET /setSettings?camLed=1
+GET /setSettings?camLed=0
 ```
 
 ### JSON API (Recommended for Network Clients)
@@ -717,6 +733,7 @@ Servos are driven via a **PCA9685** I2C PWM driver.  GPIO 26/27 (camera SCCB) ar
 | **I2C SCL**     | **15**       | J3 header — SD_CMD repurposed; built-in pull-up ensures HIGH at boot |
 | PCA9685 address | 0x40         | Default (A0–A5 all LOW) |
 | PCA9685 ch 0–7  | —            | R1–L4 servo outputs |
+| CAM LED         | 4            | On-board flash LED; web-toggle capable |
 | SD_DATA0        | 2            | Preserved — not used by HAL |
 | SD_DATA1        | 4            | Preserved — not used by HAL |
 | SD_DATA2        | 12           | Preserved — not used by HAL |

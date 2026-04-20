@@ -1,1 +1,41 @@
+# PlatformIO build/dependency folders
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# VS Code local-only files
 .vscode/launch.json
+.vscode/tasks.json
+
+# Python cache/env (software tools)
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# FreeCAD generated backups/autosaves
+*.FCBak
+*.FCStd1
+
+# KiCad local/cache/lock artifacts
+*.kicad_prl
+*_autosave-*.kicad_prl
+*_autosave-*.kicad_sch
+*-backups/
+fp-info-cache
+~*.kicad_pcb.lck
+~*.kicad_sch.lck
+hardware/pcb/pca9685_and_camera/production/sesame-robot-pcb.zip
+hardware/pcb/pca9685_and_camera/production/backups/sesame-robot-pcb_2026-04-12_20-33-57.zip
+hardware/pcb/pca9685_and_camera/libs/ul_TPS61379QWRTERQ1.zip
+commit_message.txt
