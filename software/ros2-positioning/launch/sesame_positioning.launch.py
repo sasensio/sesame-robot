@@ -139,13 +139,14 @@ def generate_launch_description() -> LaunchDescription:
         ),
     )
 
-    hint = LogInfo(msg=(
+    hint = LogInfo(msg=[
         "Sesame positioning stack launched.\n"
-        "  micro-ROS agent: udp4 port " + str(8888) + "\n"
-        "  Make sure the ESP32-CAM firmware is running and connected to the "
+        "  micro-ROS agent: udp4 port ",
+        LaunchConfiguration("agent_port"),
+        "\n  Make sure the ESP32-CAM firmware is running and connected to the "
         "same WiFi network.\n"
         "  Topics: /camera/image_raw  /sesame/pose  /sesame/cmd\n"
-        "  Run 'ros2 topic list' to verify topics are available."
-    ))
+        "  Run 'ros2 topic list' to verify topics are available.",
+    ])
 
     return LaunchDescription(args + [micro_ros_agent, aruco_node, nav_node, hint])
