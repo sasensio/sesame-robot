@@ -1,0 +1,24 @@
+{
+  "names": {
+    "rmw_microxrcedds": {
+      "cmake-args": [
+        "-DRMW_UXRCE_TRANSPORT=custom",
+        "-DRMW_UXRCE_MAX_HISTORY=4",
+        "-DRMW_UXRCE_MAX_PUBLISHERS=5",
+        "-DRMW_UXRCE_MAX_SUBSCRIPTIONS=5",
+        "-DRMW_UXRCE_MAX_SERVICES=0",
+        "-DRMW_UXRCE_MAX_CLIENTS=0",
+        "-DRMW_UXRCE_MAX_NODES=1",
+        "-DRMW_UXRCE_TRANSPORT_MTU=8192",
+        "-DRMW_UXRCE_MAX_INPUT_BUFFER_SIZE=8192",
+        "-DRMW_UXRCE_MAX_OUTPUT_BUFFER_SIZE=8192"
+      ]
+    },
+    "microxrcedds_client": {
+      "cmake-args": [
+        "-DUCLIENT_MAX_SESSION_CONNECTION_ATTEMPTS=3",
+        "-DUCLIENT_PLATFORM=POSIX"
+      ]
+    }
+  }
+}

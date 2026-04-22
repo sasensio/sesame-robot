@@ -1,0 +1,46 @@
+# =============================================================================
+# Marker Map — Sesame Robot
+# =============================================================================
+#
+# Defines the known world-frame positions of fixed ArUco reference markers
+# placed in the robot's environment.
+#
+# All positions are in metres.  yaw is the marker's orientation relative to
+# the world +X axis, measured in degrees counter-clockwise.
+#
+# The robot itself should carry marker ID 0 (default robot_marker_id).
+# All other markers listed here are fixed reference markers placed in the
+# environment whose positions are measured and entered below.
+#
+# Steps to set up:
+#   1. Print markers from:
+#        python3 -c "
+#        import cv2.aruco as a, cv2
+#        d = a.Dictionary_get(a.DICT_4X4_50)
+#        for i in [1,2,3]:
+#            img = a.drawMarker(d, i, 200)
+#            cv2.imwrite(f'marker_{i}.png', img)
+#        "
+#   2. Attach marker ID 0 to the top of the Sesame Robot.
+#   3. Place markers 1, 2, 3, … in the environment and measure their
+#      positions (x, y in metres from your chosen world origin, yaw in
+#      degrees of the marker's +Z axis relative to world +X).
+#   4. Edit the entries below with the measured values.
+# =============================================================================
+
+markers:
+  # Fixed reference markers in the environment (add/edit as needed)
+  - id: 1
+    x: 0.00
+    y: 0.00
+    yaw: 0.0    # marker facing world +X
+
+  - id: 2
+    x: 1.00
+    y: 0.00
+    yaw: 180.0  # marker facing world -X
+
+  - id: 3
+    x: 0.50
+    y: 0.80
+    yaw: 270.0  # marker facing world -Y
